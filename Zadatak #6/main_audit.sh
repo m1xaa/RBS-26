@@ -41,7 +41,5 @@ pause
 echo -e "${GREEN}"
 echo "╔════════════════════════════════════════════════════════╗"
 echo "║                    AUDIT COMPLETE                      ║"
-echo "║   Review the output above for security issues         ║"
-echo "║   Save output: ./master_audit.sh > audit_report.txt   ║"
 echo "╚════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
