@@ -38,26 +38,6 @@ echo -e "${BLUE}=== MODULE 2: USERS & AUTHENTICATION ===${NC}"
 ./user_audit.sh
 pause
 
-echo -e "${BLUE}=== MODULE 3: NETWORK & FIREWALL ===${NC}"
-echo "[Placeholder - Član 2 će implementirati]"
-echo "Provere: iptables, otvoreni portovi, IPv6, routing"
-pause
-
-echo -e "${BLUE}=== MODULE 4: SERVICES ===${NC}"
-echo "[Placeholder - Član 2 će implementirati]"
-echo "Provere: Apache, MySQL, SSH, cron, systemd servisi"
-pause
-
-echo -e "${BLUE}=== MODULE 5: OS & KERNEL ===${NC}"
-echo "[Placeholder - Član 3 će implementirati]"
-echo "Provere: kernel verzija, uptime, NTP, paketi"
-pause
-
-echo -e "${BLUE}=== MODULE 6: LOGGING ===${NC}"
-echo "[Placeholder - Član 3 će implementirati]"
-echo "Provere: rsyslog konfiguracija, remote logging, log rotacija"
-echo ""
-
 echo -e "${GREEN}"
 echo "╔════════════════════════════════════════════════════════╗"
 echo "║                    AUDIT COMPLETE                      ║"
