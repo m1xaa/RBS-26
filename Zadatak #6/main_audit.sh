@@ -38,6 +38,10 @@ echo -e "${BLUE}=== MODULE 2: USERS & AUTHENTICATION ===${NC}"
 ./user_audit.sh
 pause
 
+echo -e "${BLUE}=== MODULE 3: SYSTEM REVIEW ===${NC}"
+./system_review.sh
+pause
+
 echo -e "${GREEN}"
 echo "╔════════════════════════════════════════════════════════╗"
 echo "║                    AUDIT COMPLETE                      ║"
