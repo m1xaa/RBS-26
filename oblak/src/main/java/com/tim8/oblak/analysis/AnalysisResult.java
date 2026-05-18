@@ -1,0 +1,15 @@
+package com.tim8.oblak.analysis;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+import java.util.List;
+
+@Getter
+@AllArgsConstructor
+public class AnalysisResult {
+
+    private boolean malicious;
+    private String banditOutput;
+    private List<String> issues;
+}
