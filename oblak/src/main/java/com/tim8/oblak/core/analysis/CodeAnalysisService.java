@@ -2,8 +2,12 @@ package com.tim8.oblak.core.analysis;
 
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Service
 public class CodeAnalysisService {
@@ -25,6 +29,26 @@ public class CodeAnalysisService {
                         bandit.contains("MEDIUM");
 
         return new AnalysisResult(malicious, bandit, issues);
+    }
+
+    public List<AnalysisResult> analyzeExtractedFiles(Path extractedDirectory) {
+        try (Stream<Path> paths = Files.walk(extractedDirectory)) {
+            return paths
+                .filter(Files::isRegularFile)
+                .map(this::analyzeFile)
+                .toList();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not read extracted files.", exception);
+        }
+    }
+
+    private AnalysisResult analyzeFile(Path path) {
+        try {
+            String code = Files.readString(path);
+            return analyze(code);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not read extracted file: " + path, exception);
+        }
     }
 
     private boolean isMaliciousByRules(String code) {
