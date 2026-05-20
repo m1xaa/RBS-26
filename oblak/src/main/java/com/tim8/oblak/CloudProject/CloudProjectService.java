@@ -3,8 +3,13 @@ package com.tim8.oblak.CloudProject;
 import com.tim8.oblak.analysis.AnalysisResult;
 import com.tim8.oblak.analysis.CodeAnalysisService;
 import com.tim8.oblak.minio.MinioService;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -22,23 +27,26 @@ public class CloudProjectService {
         this.analysisService = analysisService;
     }
 
-    public CloudProject save(String name, Map<String, String> files) {
+    public CloudProject save(String name, Map<String, String> files, String ownerUsername) {
 
         String mainCode = files.get("main.py");
 
         if (mainCode == null) {
-            throw new RuntimeException("main.py is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "main.py is required");
         }
 
         AnalysisResult result = analysisService.analyze(mainCode);
 
         if (result.isMalicious()) {
-            throw new RuntimeException("Malicious code detected by analysis pipeline");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Malicious code detected by analysis pipeline");
         }
 
         CloudProject project = new CloudProject();
         project.setName(name);
         project.setStatus("ANALYZED");
+        project.setOwnerUsername(ownerUsername);
 
         CloudProject saved = repository.save(project);
 
@@ -53,11 +61,25 @@ public class CloudProjectService {
         return saved;
     }
 
-    public String execute(Long id) {
-        try {
-            CloudProject project = repository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Project not found"));
+    public List<CloudProject> list(Authentication auth) {
+        if (isAdmin(auth)) {
+            return repository.findAll();
+        }
+        return repository.findByOwnerUsername(auth.getName());
+    }
 
+    public String execute(Long id, Authentication auth) {
+        CloudProject project = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Project not found"));
+
+        // Autorizacija: vlasnik moze sve, admin moze sve, ostali ne.
+        if (!isAdmin(auth) && !project.getOwnerUsername().equals(auth.getName())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Nije dozvoljen pristup ovom projektu");
+        }
+
+        try {
             String code = minioService.getFile(id, "main.py");
 
             java.nio.file.Path file =
@@ -81,5 +103,14 @@ public class CloudProjectService {
         } catch (Exception e) {
             return "Error: " + e.getMessage();
         }
+    }
+
+    private boolean isAdmin(Authentication auth) {
+        for (GrantedAuthority a : auth.getAuthorities()) {
+            if ("ROLE_ADMIN".equals(a.getAuthority())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
