@@ -1,4 +1,4 @@
-package com.tim8.oblak.analysis;
+package com.tim8.oblak.core.analysis;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

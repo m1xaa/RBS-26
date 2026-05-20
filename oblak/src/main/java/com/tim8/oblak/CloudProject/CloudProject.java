@@ -19,10 +19,5 @@ public class CloudProject {
 
     private String status;
 
-    /**
-     * Username vlasnika projekta. Cuvamo samo string, ne ManyToOne referencu,
-     * da bismo ostali jednostavni - autorizacija se svodi na poredjenje stringa
-     * sa principal-om iz SecurityContext-a.
-     */
     private String ownerUsername;
 }
