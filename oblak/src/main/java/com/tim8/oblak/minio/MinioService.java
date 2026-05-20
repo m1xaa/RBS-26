@@ -1,49 +1,45 @@
 package com.tim8.oblak.minio;
 
-import io.minio.*;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class MinioService {
 
     private final MinioClient minioClient;
 
-    public MinioService(MinioClient minioClient) {
-        this.minioClient = minioClient;
-    }
+    @Value("${oblak.minio.bucket}")
+    private String bucket;
 
-    public void uploadFile(Long projectId, String filename, String content) {
-        try {
-            ByteArrayInputStream stream =
-                    new ByteArrayInputStream(content.getBytes());
+    public String uploadProjectImage(Path imagePath, UUID projectId) {
+        String objectKey = buildObjectKey(projectId);
 
+        try (InputStream inputStream = Files.newInputStream(imagePath)) {
             minioClient.putObject(
-                    PutObjectArgs.builder()
-                            .bucket("projects")
-                            .object(projectId + "/" + filename)
-                            .stream(stream, content.length(), -1)
-                            .contentType("text/plain")
-                            .build()
+                PutObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(objectKey)
+                    .stream(inputStream, Files.size(imagePath), -1)
+                    .contentType("application/octet-stream")
+                    .build()
             );
 
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            return objectKey;
+        } catch (Exception exception) {
+            throw new IllegalStateException("Could not upload project image to MinIO.", exception);
         }
     }
 
-    public String getFile(Long projectId, String filename) {
-        try (InputStream stream = minioClient.getObject(
-                GetObjectArgs.builder()
-                        .bucket("projects")
-                        .object(projectId + "/" + filename)
-                        .build()
-        )) {
-            return new String(stream.readAllBytes());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    private String buildObjectKey(UUID projectId) {
+        return projectId.toString();
     }
 }

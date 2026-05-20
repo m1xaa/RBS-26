@@ -1,4 +1,4 @@
-package com.tim8.oblak.analysis;
+package com.tim8.oblak.core.analysis;
 
 import org.springframework.stereotype.Service;
 
