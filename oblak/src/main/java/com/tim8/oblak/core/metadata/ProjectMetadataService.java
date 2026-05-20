@@ -14,6 +14,8 @@ public class ProjectMetadataService {
         ProjectMetadata metadata = new ProjectMetadata();
         metadata.setName(file.getOriginalFilename());
         metadata.setSize(file.getSize());
+        metadata.setWorkingDirectory(".");
+        metadata.setRootFile("main.py");
         metadata.setUploadStatus(ProjectUploadStatus.PENDING);
 
         return projectMetadataRepository.save(metadata);

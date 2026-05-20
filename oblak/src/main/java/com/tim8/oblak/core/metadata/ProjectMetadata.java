@@ -29,6 +29,10 @@ public class ProjectMetadata {
 
     private String name;
 
+    private String workingDirectory;
+
+    private String rootFile;
+
     @Enumerated(EnumType.STRING)
     private ProjectUploadStatus uploadStatus;
 }
