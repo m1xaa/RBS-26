@@ -19,18 +19,23 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final PasswordPolicyService passwordPolicy;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
-                       RefreshTokenService refreshTokenService) {
+                       RefreshTokenService refreshTokenService,
+                       PasswordPolicyService passwordPolicy) {  // NOVO
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
+        this.passwordPolicy = passwordPolicy;
     }
 
     public AuthResponse register(RegisterRequest req) {
+        passwordPolicy.validate(req.password(), req.username());
+
         if (userRepository.findByUsername(req.username()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Korisnicko ime je vec zauzeto");
@@ -39,7 +44,6 @@ public class AuthService {
         User user = new User();
         user.setUsername(req.username());
         user.setPassword(passwordEncoder.encode(req.password()));
-        user.setRole(Role.USER);
         userRepository.save(user);
 
         return buildAuthResponse(user);

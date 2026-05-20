@@ -22,19 +22,12 @@ import os
 from pathlib import Path
 from getpass import getpass
 
-# ---------------------------------------------------------------------------
-# Konfiguracija
-# ---------------------------------------------------------------------------
 
 CONFIG_DIR = Path.home() / ".cdk"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 DEFAULT_SERVER_URL = os.environ.get("OBLAK_SERVER_URL", "http://localhost:8080")
 
-
-# ---------------------------------------------------------------------------
-# Helper-i za lokalni config
-# ---------------------------------------------------------------------------
 
 def load_config() -> dict:
     if not CONFIG_FILE.exists():
@@ -80,20 +73,12 @@ def handle_auth_error(response: requests.Response) -> None:
         raise click.Abort()
 
 
-# ---------------------------------------------------------------------------
-# CLI grupa
-# ---------------------------------------------------------------------------
-
 @click.group()
 @click.version_option(version="0.3.0", prog_name="cdk")
 def cli():
     """Oblak CDK CLI - upload fajlova na Oblak platformu."""
     pass
 
-
-# ---------------------------------------------------------------------------
-# cdk config
-# ---------------------------------------------------------------------------
 
 @cli.command()
 @click.option("--server", default=None, help="Postavi URL Oblak servera")
@@ -110,10 +95,6 @@ def config(server: str):
     click.echo(f"Ulogovan:   {cfg.get('username', '(ne)')}")
     click.echo(f"Config:     {CONFIG_FILE}")
 
-
-# ---------------------------------------------------------------------------
-# cdk login
-# ---------------------------------------------------------------------------
 
 @cli.command()
 @click.option("--server", default=None, help="URL Oblak servera")
@@ -156,10 +137,6 @@ def login(server: str, username: str):
                f"na {server_url}")
 
 
-# ---------------------------------------------------------------------------
-# cdk logout
-# ---------------------------------------------------------------------------
-
 @cli.command()
 def logout():
     """Brise lokalnu sesiju."""
@@ -170,10 +147,6 @@ def logout():
     save_config({"server_url": cfg.get("server_url", DEFAULT_SERVER_URL)})
     click.echo("Uspesno izlogovani.")
 
-
-# ---------------------------------------------------------------------------
-# cdk whoami
-# ---------------------------------------------------------------------------
 
 @cli.command()
 def whoami():
@@ -187,10 +160,6 @@ def whoami():
     click.echo(f"Server:        {cfg.get('server_url')}")
 
 
-# ---------------------------------------------------------------------------
-# cdk upload
-# ---------------------------------------------------------------------------
-
 @cli.command()
 @click.argument("file_path", type=click.Path(exists=True, dir_okay=False))
 def upload(file_path: str):
@@ -199,7 +168,7 @@ def upload(file_path: str):
 
     Primer:
         cdk upload main.py
-        cdk upload C:\\Users\\Jovana\\Desktop\\test.zip
+        cdk upload C:\\Users\\User\\Desktop\\test.zip
     """
     path = Path(file_path).resolve()
 
