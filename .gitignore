@@ -1,0 +1,15 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# setuptools / packaging
+*.egg-info/
+.eggs/
