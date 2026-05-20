@@ -1,17 +1,21 @@
 """
-Oblak CDK CLI - klijent aplikacija za upload fajlova na Oblak platformu.
+Oblak CDK CLI - klijent za upload fajlova na Oblak platformu.
 
-Server endpoint-i koje koristi:
-    POST /auth/login      - {username, password} -> {accessToken, ...}
+Server endpoint-i:
+    POST /auth/register   - {username, password} -> AuthResponse
+    POST /auth/login      - {username, password} -> AuthResponse
+    POST /auth/refresh    - {refreshToken} -> AuthResponse
+    POST /auth/logout     - {refreshToken} -> 200
     POST /api/upload      - multipart/form-data sa poljem 'file'
 
-/api/upload zahteva Authorization: Bearer <token> header i rolu ADMIN ili USER.
+AuthResponse: {accessToken, refreshToken, username, accessExpirationMs}
 
 Komande:
-    cdk login    - autentikacija ka serveru, cuva JWT lokalno
-    cdk logout   - brise lokalnu sesiju
-    cdk whoami   - prikazuje trenutno ulogovanog korisnika
-    cdk upload   - upload fajla na server
+    cdk register - kreiranje novog naloga
+    cdk login    - prijava na server
+    cdk logout   - brisanje sesije
+    cdk whoami   - prikaz trenutnog korisnika
+    cdk upload   - upload fajla
     cdk config   - prikaz/podesavanje server URL-a
 """
 
@@ -53,28 +57,95 @@ def get_server_url() -> str:
     return load_config().get("server_url", DEFAULT_SERVER_URL)
 
 
-def get_auth_headers() -> dict:
-    """Vraca Authorization header. Prekida komandu ako korisnik nije ulogovan."""
-    token = load_config().get("access_token")
+def save_session(server_url: str, data: dict) -> None:
+    """Cuva tokene iz AuthResponse u config."""
+    save_config({
+        "server_url": server_url,
+        "username": data.get("username"),
+        "access_token": data["accessToken"],
+        "refresh_token": data["refreshToken"],
+        "access_expiration_ms": data.get("accessExpirationMs"),
+    })
+
+
+
+def show_password_validation_error(response: requests.Response) -> None:
+    """Prikazuje listu pravila koje lozinka nije ispunila."""
+    try:
+        data = response.json()
+        click.echo("Lozinka ne ispunjava bezbednosne zahteve:", err=True)
+        for err in data.get("details", []):
+            click.echo(f"  - {err}", err=True)
+    except ValueError:
+        click.echo(f"Greska: {response.text}", err=True)
+
+
+def try_refresh_token() -> bool:
+    """
+    Pokusava da osvezi access token koristeci refresh token.
+    Vraca True ako je uspeo, False ako je refresh token istekao/nevazeci.
+    """
+    cfg = load_config()
+    refresh_token = cfg.get("refresh_token")
+    if not refresh_token:
+        return False
+
+    try:
+        response = requests.post(
+            f"{get_server_url()}/auth/refresh",
+            json={"refreshToken": refresh_token},
+            timeout=10,
+        )
+    except requests.RequestException:
+        return False
+
+    if response.status_code != 200:
+        return False
+
+    save_session(cfg.get("server_url", DEFAULT_SERVER_URL), response.json())
+    return True
+
+
+def authenticated_request(method: str, url: str, **kwargs) -> requests.Response:
+    """
+    Salje autentifikovan zahtev. Ako vrati 401, pokusava refresh i ponavlja.
+    Ako i refresh ne uspe, prekida komandu sa porukom za login.
+    """
+    cfg = load_config()
+    token = cfg.get("access_token")
     if not token:
         click.echo("Niste ulogovani. Pokrenite: cdk login", err=True)
         raise click.Abort()
-    return {"Authorization": f"Bearer {token}"}
 
+    headers = kwargs.pop("headers", {})
+    headers["Authorization"] = f"Bearer {token}"
 
-def handle_auth_error(response: requests.Response) -> None:
-    """Centralizovana poruka za 401/403."""
+    response = requests.request(method, url, headers=headers, **kwargs)
+
     if response.status_code == 401:
-        click.echo("Sesija je istekla ili je token nevazeci. Pokrenite: cdk login",
-                   err=True)
-        raise click.Abort()
+        if try_refresh_token():
+            new_token = load_config().get("access_token")
+            headers["Authorization"] = f"Bearer {new_token}"
+
+            # Ako saljemo fajl, ne mozemo da ponovimo (stream je iscrpljen)
+            if "files" in kwargs:
+                click.echo("Sesija je obnovljena. Pokusajte ponovo.", err=True)
+                raise click.Abort()
+
+            response = requests.request(method, url, headers=headers, **kwargs)
+        else:
+            click.echo("Sesija je istekla. Pokrenite: cdk login", err=True)
+            raise click.Abort()
+
     if response.status_code == 403:
         click.echo("Nemate dozvolu za ovu operaciju.", err=True)
         raise click.Abort()
 
+    return response
+
 
 @click.group()
-@click.version_option(version="0.3.0", prog_name="cdk")
+@click.version_option(version="0.4.0", prog_name="cdk")
 def cli():
     """Oblak CDK CLI - upload fajlova na Oblak platformu."""
     pass
@@ -99,8 +170,49 @@ def config(server: str):
 @cli.command()
 @click.option("--server", default=None, help="URL Oblak servera")
 @click.option("--username", "-u", default=None, help="Korisnicko ime")
+def register(server: str, username: str):
+    """Kreira novi nalog na serveru i automatski prijavljuje."""
+    server_url = server or get_server_url()
+
+    if not username:
+        username = click.prompt("Korisnicko ime")
+
+    password = getpass("Lozinka: ")
+    password_confirm = getpass("Ponovite lozinku: ")
+    if password != password_confirm:
+        click.echo("Lozinke se ne podudaraju.", err=True)
+        raise click.Abort()
+
+    try:
+        response = requests.post(
+            f"{server_url}/auth/register",
+            json={"username": username, "password": password},
+            timeout=10,
+        )
+    except requests.RequestException as e:
+        click.echo(f"Greska u komunikaciji sa serverom: {e}", err=True)
+        raise click.Abort()
+
+    if response.status_code == 400:
+        show_password_validation_error(response)
+        raise click.Abort()
+    if response.status_code == 403:
+        click.echo("Korisnicko ime je vec zauzeto.", err=True)
+        raise click.Abort()
+    if response.status_code != 200:
+        click.echo(f"Greska {response.status_code}: {response.text}", err=True)
+        raise click.Abort()
+
+    data = response.json()
+    save_session(server_url, data)
+    click.echo(f"Nalog '{username}' uspesno kreiran i prijavljen na {server_url}.")
+
+
+@cli.command()
+@click.option("--server", default=None, help="URL Oblak servera")
+@click.option("--username", "-u", default=None, help="Korisnicko ime")
 def login(server: str, username: str):
-    """Autentikacija ka Oblak serveru. Cuva access token lokalno."""
+    """Prijava na Oblak server."""
     server_url = server or get_server_url()
 
     if not username:
@@ -126,26 +238,30 @@ def login(server: str, username: str):
         raise click.Abort()
 
     data = response.json()
-    save_config({
-        "server_url": server_url,
-        "username": data.get("username", username),
-        "role": data.get("role"),
-        "access_token": data["accessToken"],
-        "expires_in_ms": data.get("expiresInMs"),
-    })
-    click.echo(f"Uspesno ulogovani kao '{username}' ({data.get('role')}) "
-               f"na {server_url}")
+    save_session(server_url, data)
+    click.echo(f"Uspesno ulogovani kao '{username}' na {server_url}")
 
 
 @cli.command()
 def logout():
-    """Brise lokalnu sesiju."""
+    """Brise sesiju lokalno i revoke-uje refresh token na serveru."""
     cfg = load_config()
-    if not cfg.get("access_token"):
-        click.echo("Nije bilo aktivne sesije.")
-        return
+    refresh_token = cfg.get("refresh_token")
+
+    if refresh_token:
+        try:
+            requests.post(
+                f"{get_server_url()}/auth/logout",
+                json={"refreshToken": refresh_token},
+                timeout=10,
+            )
+        except requests.RequestException:
+            # Best-effort - ako server nije dostupan, brisemo lokalno
+            pass
+
     save_config({"server_url": cfg.get("server_url", DEFAULT_SERVER_URL)})
     click.echo("Uspesno izlogovani.")
+
 
 
 @cli.command()
@@ -156,7 +272,7 @@ def whoami():
     if not username or not cfg.get("access_token"):
         click.echo("Niste ulogovani.")
         return
-    click.echo(f"Ulogovani kao: {username} ({cfg.get('role', 'unknown')})")
+    click.echo(f"Ulogovani kao: {username}")
     click.echo(f"Server:        {cfg.get('server_url')}")
 
 
@@ -168,25 +284,22 @@ def upload(file_path: str):
 
     Primer:
         cdk upload main.py
-        cdk upload C:\\Users\\User\\Desktop\\test.zip
+        cdk upload C:\\Users\\Jovana\\Desktop\\test.zip
     """
     path = Path(file_path).resolve()
-
     click.echo(f"Saljem fajl '{path.name}' ({path.stat().st_size} bajta) na server...")
 
     try:
         with open(path, "rb") as f:
-            response = requests.post(
+            response = authenticated_request(
+                "POST",
                 f"{get_server_url()}/api/upload",
-                headers=get_auth_headers(),
                 files={"file": (path.name, f)},
                 timeout=60,
             )
     except requests.RequestException as e:
         click.echo(f"Greska u komunikaciji sa serverom: {e}", err=True)
         raise click.Abort()
-
-    handle_auth_error(response)
 
     if response.status_code not in (200, 201):
         click.echo(f"Greska {response.status_code}: {response.text}", err=True)
