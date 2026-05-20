@@ -15,14 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * Filter koji za svaki request proverava Authorization: Bearer <token> header.
- * Ako je token validan, postavlja Authentication u SecurityContext sa
- * username-om kao principal-om i rolom kao authority (ROLE_USER ili ROLE_ADMIN).
- *
- * Ako tokena nema ili nije validan, filter ne baca gresku - prosledjuje
- * dalje, a SecurityConfig ce odbiti zahtev jer endpoint zahteva autentikaciju.
- */
+
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
@@ -47,15 +40,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String username = claims.getSubject();
                 String role = claims.get("role", String.class);
 
-                var auth = new UsernamePasswordAuthenticationToken(
-                        username,
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                );
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                List<SimpleGrantedAuthority> authorities =
+                        List.of(new SimpleGrantedAuthority("ROLE_" + role));
+
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(username, null, authorities);
+
+                SecurityContextHolder.getContext().setAuthentication(authToken);
             } catch (JwtException e) {
-                // Nevazeci token - ostavljamo SecurityContext praznim,
-                // SecurityConfig ce vratiti 401 za zasticene endpoint-e.
                 SecurityContextHolder.clearContext();
             }
         }

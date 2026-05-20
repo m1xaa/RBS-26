@@ -10,13 +10,6 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
-/**
- * Generisanje i parsiranje JWT tokena.
- *
- * Tajni kljuc i vreme isteka se citaju iz application.properties:
- *   jwt.secret=...                (min 32 bajta za HS256)
- *   jwt.expiration-ms=86400000    (24h)
- */
 @Service
 public class JwtService {
 

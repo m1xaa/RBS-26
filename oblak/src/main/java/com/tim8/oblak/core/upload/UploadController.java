@@ -3,6 +3,7 @@ package com.tim8.oblak.core.upload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -19,6 +20,7 @@ public class UploadController {
     @PostMapping(
         consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<Void> upload(@RequestPart("file") MultipartFile file) {
         uploadService.upload(file);
         return ResponseEntity.ok().build();

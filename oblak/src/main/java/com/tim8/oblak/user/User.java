@@ -11,6 +11,7 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+
 @Entity(name = "app_user")
 @Getter
 @Setter
@@ -32,7 +33,4 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
-    public enum Role {
-        USER, ADMIN
-    }
 }
