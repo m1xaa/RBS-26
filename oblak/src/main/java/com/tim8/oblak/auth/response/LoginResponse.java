@@ -1,4 +1,4 @@
-package com.tim8.oblak.auth;
+package com.tim8.oblak.auth.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

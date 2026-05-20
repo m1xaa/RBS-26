@@ -1,51 +1,42 @@
 package com.tim8.oblak.auth;
 
-import com.tim8.oblak.security.JwtService;
-import com.tim8.oblak.user.User;
-import com.tim8.oblak.user.UserRepository;
+import com.tim8.oblak.auth.request.*;
+import com.tim8.oblak.auth.response.*;
+import com.tim8.oblak.security.*;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    private final AuthService authService;
 
-    public AuthController(UserRepository userRepository,
-                          PasswordEncoder passwordEncoder,
-                          JwtService jwtService) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest req) {
+        return ResponseEntity.ok(authService.register(req));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "Neispravni kredencijali"));
+    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest req) {
+        return ResponseEntity.ok(authService.login(req));
+    }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED, "Neispravni kredencijali");
-        }
+    @PostMapping("/refresh")
+    @PreAuthorize("hasAnyRole('USER')")
+    public ResponseEntity<AuthResponse> refresh(@RequestBody RefreshRequest req) {
+        return ResponseEntity.ok(authService.refresh(req));
+    }
 
-        String token = jwtService.generateToken(user.getUsername(), user.getRole().name());
-
-        return ResponseEntity.ok(new LoginResponse(
-                token,
-                user.getUsername(),
-                user.getRole().name(),
-                jwtService.getExpirationMs()
-        ));
+    @PostMapping("/logout")
+    @PreAuthorize("hasAnyRole('USER')")
+    public ResponseEntity<Void> logout(@RequestBody RefreshRequest req) {
+        authService.logout(req);
+        return ResponseEntity.ok().build();
     }
 }
