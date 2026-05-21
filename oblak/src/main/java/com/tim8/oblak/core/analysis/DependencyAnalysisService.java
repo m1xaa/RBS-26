@@ -10,42 +10,69 @@ import java.nio.file.Path;
 @Service
 public class DependencyAnalysisService {
 
-    public String analyze(Path extractedDirectory) {
+    public DependencyResult analyze(Path extractedDirectory) {
 
         try {
-
             Path requirements = extractedDirectory.resolve("requirements.txt");
 
             if (!Files.exists(requirements)) {
-                return "No requirements.txt";
+                return new DependencyResult(
+                        false,
+                        0,
+                        "No requirements.txt",
+                        false
+                );
             }
 
             Process process = new ProcessBuilder(
                     "pip-audit",
                     "-r",
-                    requirements.toString()
+                    requirements.toString(),
+                    "--format=json"
             )
                     .redirectErrorStream(true)
                     .start();
 
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream())
-            );
-
             StringBuilder output = new StringBuilder();
 
-            String line;
-
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream())
+            )) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
             }
 
-            process.waitFor();
+            int exitCode = process.waitFor();
+            String raw = output.toString();
 
-            return output.toString();
+            boolean failed =
+                    exitCode != 0 ||
+                            raw.contains("Could not find a version") ||
+                            raw.contains("ERROR") ||
+                            raw.contains("Failed");
 
-        } catch (Exception exception) {
-            return "Dependency analysis error: " + exception.getMessage();
+            int vulnerabilities = 0;
+
+            if (raw.contains("\"vulnerabilities\"")) {
+                vulnerabilities = raw.split("vulnerability").length - 1;
+            }
+
+            return new DependencyResult(
+                    failed,
+                    vulnerabilities,
+                    raw,
+                    failed || vulnerabilities > 0
+            );
+
+        } catch (Exception e) {
+            return new DependencyResult(
+                    true,
+                    0,
+                    "Dependency analysis error: " + e.getMessage(),
+                    true
+            );
         }
     }
 }

@@ -6,6 +6,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.Map;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -19,6 +21,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleIllegalStateException(IllegalStateException exception) {
         ApiError error = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR.value(), exception.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+
+    @ExceptionHandler(MaliciousCodeException.class)
+    public ResponseEntity<?> handleMalicious(MaliciousCodeException ex) {
+        return ResponseEntity
+                .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(Map.of(
+                        "status", "REJECTED",
+                        "reason", ex.getMessage()
+                ));
     }
 
     private record ApiError(int status, String message) {

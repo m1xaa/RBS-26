@@ -1,5 +1,7 @@
 package com.tim8.oblak.core.analysis;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -8,10 +10,18 @@ import java.io.InputStreamReader;
 @Service
 public class BanditService {
 
-    public String scan(String code) {
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    public BanditResult scan(String code) {
+
         try {
-            Process process = new ProcessBuilder("bandit", "-q", "-")
-                    .start();
+            Process process = new ProcessBuilder(
+                    "bandit",
+                    "-q",
+                    "-f",
+                    "json",
+                    "-"
+            ).start();
 
             process.getOutputStream().write(code.getBytes());
             process.getOutputStream().close();
@@ -24,13 +34,30 @@ public class BanditService {
             String line;
 
             while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
+                output.append(line);
             }
 
-            return output.toString();
+            JsonNode root = mapper.readTree(output.toString());
+
+            int high = root.path("metrics")
+                    .path("_totals")
+                    .path("SEVERITY.HIGH")
+                    .asInt();
+
+            int medium = root.path("metrics")
+                    .path("_totals")
+                    .path("SEVERITY.MEDIUM")
+                    .asInt();
+
+            int low = root.path("metrics")
+                    .path("_totals")
+                    .path("SEVERITY.LOW")
+                    .asInt();
+
+            return new BanditResult(high, medium, low, output.toString());
 
         } catch (Exception e) {
-            return "Bandit error: " + e.getMessage();
+            return new BanditResult(0, 0, 0, "ERROR: " + e.getMessage());
         }
     }
 }

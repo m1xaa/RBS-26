@@ -9,7 +9,7 @@ import java.nio.file.Path;
 @Service
 public class AntivirusService {
 
-    public String scan(Path directory) {
+    public ClamResult scan(Path directory) {
 
         try {
             Process process = new ProcessBuilder(
@@ -25,19 +25,26 @@ public class AntivirusService {
             );
 
             StringBuilder output = new StringBuilder();
-
             String line;
+
+            int infected = 0;
 
             while ((line = reader.readLine()) != null) {
                 output.append(line).append("\n");
+
+                if (line.contains("Infected files:")) {
+                    infected = Integer.parseInt(
+                            line.replaceAll("\\D+", "")
+                    );
+                }
             }
 
             process.waitFor();
 
-            return output.toString();
+            return new ClamResult(infected, output.toString());
 
-        } catch (Exception exception) {
-            return "ClamAV error: " + exception.getMessage();
+        } catch (Exception e) {
+            return new ClamResult(-1, "ERROR: " + e.getMessage());
         }
     }
 }
