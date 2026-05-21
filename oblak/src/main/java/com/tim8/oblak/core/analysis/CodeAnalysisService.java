@@ -1,5 +1,6 @@
 package com.tim8.oblak.core.analysis;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -7,48 +8,88 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Stream;
 
 @Service
+@RequiredArgsConstructor
 public class CodeAnalysisService {
 
     private final BanditService banditService;
-
-    public CodeAnalysisService(BanditService banditService) {
-        this.banditService = banditService;
-    }
-
-    public AnalysisResult analyze(String code) {
-
-        String bandit = banditService.scan(code);
-        List<String> issues = staticAnalysis(code);
-
-        boolean malicious =
-                isMaliciousByRules(code) ||
-                        bandit.contains("HIGH") ||
-                        bandit.contains("MEDIUM");
-
-        return new AnalysisResult(malicious, bandit, issues);
-    }
+    private final AntivirusService antivirusService;
+    private final DependencyAnalysisService dependencyAnalysisService;
 
     public List<AnalysisResult> analyzeExtractedFiles(Path extractedDirectory) {
-        try (Stream<Path> paths = Files.walk(extractedDirectory)) {
-            return paths
-                .filter(Files::isRegularFile)
-                .map(this::analyzeFile)
-                .toList();
+
+        String antivirusOutput = antivirusService.scan(extractedDirectory);
+
+        String dependencyOutput =
+                dependencyAnalysisService.analyze(extractedDirectory);
+
+        List<AnalysisResult> results = new ArrayList<>();
+
+        try {
+
+            Files.walk(extractedDirectory)
+                    .filter(Files::isRegularFile)
+                    .filter(this::isPythonFile)
+                    .forEach(path -> {
+                        results.add(
+                                analyzeFile(
+                                        path,
+                                        antivirusOutput,
+                                        dependencyOutput
+                                )
+                        );
+                    });
+
+            return results;
+
         } catch (IOException exception) {
-            throw new IllegalStateException("Could not read extracted files.", exception);
+            throw new IllegalStateException(
+                    "Could not analyze extracted files.",
+                    exception
+            );
         }
     }
 
-    private AnalysisResult analyzeFile(Path path) {
+    private AnalysisResult analyzeFile(
+            Path path,
+            String antivirusOutput,
+            String dependencyOutput
+    ) {
+
         try {
+
             String code = Files.readString(path);
-            return analyze(code);
+
+            String banditOutput = banditService.scan(code);
+
+            List<String> issues = staticAnalysis(code);
+
+            boolean malicious =
+                    isMaliciousByRules(code)
+                            || banditOutput.contains("HIGH")
+                            || banditOutput.contains("MEDIUM")
+                            || antivirusOutput.contains("FOUND")
+                            || dependencyOutput.contains("VULNERABILITY");
+
+            return new AnalysisResult(
+                    malicious,
+                    banditOutput,
+                    antivirusOutput,
+                    dependencyOutput,
+                    issues
+            );
+
         } catch (IOException exception) {
-            throw new IllegalStateException("Could not read extracted file: " + path, exception);
+            throw new IllegalStateException(
+                    "Could not read file: " + path,
+                    exception
+            );
         }
+    }
+
+    private boolean isPythonFile(Path path) {
+        return path.toString().endsWith(".py");
     }
 
     private boolean isMaliciousByRules(String code) {
@@ -59,7 +100,11 @@ public class CodeAnalysisService {
                 || lower.contains("os.system")
                 || lower.contains("subprocess")
                 || lower.contains("eval(")
-                || lower.contains("exec(");
+                || lower.contains("exec(")
+                || lower.contains("socket")
+                || lower.contains("fork")
+                || lower.contains("pty")
+                || lower.contains("ctypes");
     }
 
     private List<String> staticAnalysis(String code) {
@@ -78,6 +123,18 @@ public class CodeAnalysisService {
 
             if (line.contains("while True")) {
                 issues.add("Possible infinite loop");
+            }
+
+            if (line.contains("os.system")) {
+                issues.add("Shell execution detected");
+            }
+
+            if (line.contains("subprocess")) {
+                issues.add("Subprocess execution detected");
+            }
+
+            if (line.contains("socket")) {
+                issues.add("Network communication detected");
             }
         }
 
