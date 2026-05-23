@@ -5,7 +5,9 @@ import com.tim8.oblak.core.metadata.ProjectMetadataRepository;
 import com.tim8.oblak.firecracker.assets.FirecrackerAssetService;
 import com.tim8.oblak.minio.MinioService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,10 +22,21 @@ public class ExecutionService {
     private final ProjectMetadataRepository projectMetadataRepository;
     private final FirecrackerOrchestrator firecrackerOrchestrator;
 
-    public ExecutionResult execute(String url) {
-        UUID projectId = UUID.fromString(url);
+    public ExecutionResult execute(UUID projectId, String requesterUsername) {
         ProjectMetadata metadata = projectMetadataRepository.findById(projectId)
-                .orElseThrow(() -> new IllegalArgumentException("Project metadata not found for id: " + url));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Project not found: " + projectId
+                ));
+
+        if (metadata.getOwner() == null
+                || !metadata.getOwner().getUsername().equals(requesterUsername)) {
+            // Vracamo 404, ne 403, da ne otkrivamo postojanje projekta drugim korisnicima.
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Project not found: " + projectId
+            );
+        }
 
         firecrackerAssetService.ensureRequiredAssetsExist();
         Path projectImage = minioService.downloadProjectImage(projectId);
