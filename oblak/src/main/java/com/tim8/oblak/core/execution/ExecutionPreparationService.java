@@ -23,12 +23,13 @@ public class ExecutionPreparationService {
      * Ako install padne, brise libs direktorijum i baca izuzetak.
      */
     public void prepare(Path projectDirectory) {
-        Path requirements = projectDirectory.resolve("requirements.txt");
+        Path absProjectDir = projectDirectory.toAbsolutePath().normalize();
+        Path requirements = absProjectDir.resolve("requirements.txt");
         if (!Files.exists(requirements)) {
             return;
         }
 
-        Path libsDir = projectDirectory.resolve(LIBS_DIR_NAME);
+        Path libsDir = absProjectDir.resolve(LIBS_DIR_NAME);
 
         try {
             Process installProcess = new ProcessBuilder(
@@ -38,7 +39,7 @@ public class ExecutionPreparationService {
                     "--target", libsDir.toString(),
                     "-r", requirements.toString()
             )
-                    .directory(projectDirectory.toFile())
+                    .directory(absProjectDir.toFile())
                     .redirectErrorStream(true)
                     .start();
 
@@ -62,7 +63,6 @@ public class ExecutionPreparationService {
             );
         }
     }
-
     private void deleteLibsDirectory(Path libsDir) {
         if (!Files.exists(libsDir)) {
             return;
