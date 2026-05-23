@@ -20,7 +20,6 @@ public class UploadController {
     @PostMapping(
         consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
-    @PreAuthorize("hasAnyRole('USER')")
     public ResponseEntity<Void> upload(@RequestPart("file") MultipartFile file) {
         uploadService.upload(file);
         return ResponseEntity.ok().build();
