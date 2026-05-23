@@ -18,8 +18,9 @@ public class ExecutionController {
     }
 
     @PostMapping("/{url}")
-    public ResponseEntity<Void> execute(@PathVariable String url) {
-        executionService.execute(url);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<ExecutionResult> execute(@PathVariable String url) {
+        ExecutionResult executionResult = executionService.execute(url);
+        System.out.println("Execution result: " + executionResult);
+        return ResponseEntity.ok(executionResult);
     }
 }

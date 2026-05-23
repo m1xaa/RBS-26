@@ -20,7 +20,7 @@ public class ExecutionService {
     private final ProjectMetadataRepository projectMetadataRepository;
     private final FirecrackerOrchestrator firecrackerOrchestrator;
 
-    public void execute(String url) {
+    public ExecutionResult execute(String url) {
         UUID projectId = UUID.fromString(url);
         ProjectMetadata metadata = projectMetadataRepository.findById(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project metadata not found for id: " + url));
@@ -28,7 +28,7 @@ public class ExecutionService {
         firecrackerAssetService.ensureRequiredAssetsExist();
         Path projectImage = minioService.downloadProjectImage(projectId);
         try {
-            firecrackerOrchestrator.execute(
+            return firecrackerOrchestrator.execute(
                     firecrackerAssetService.getKernelPath(),
                     firecrackerAssetService.getRootfsPath(),
                     projectImage,

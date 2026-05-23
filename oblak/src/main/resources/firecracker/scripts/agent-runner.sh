@@ -17,18 +17,32 @@ shutdown_vm() {
   echo "[agent] finished with exit_code=$code"
   sync
 
+  if [ -w /proc/sysrq-trigger ]; then
+    echo "[agent] attempting guest poweroff via sysrq"
+    echo o > /proc/sysrq-trigger
+    sleep 2
+  fi
+
+  if command -v halt >/dev/null 2>&1; then
+    echo "[agent] attempting halt -f"
+    halt -f
+    sleep 2
+  fi
+
   if command -v poweroff >/dev/null 2>&1; then
+    echo "[agent] attempting poweroff -f"
     poweroff -f
+    sleep 2
   fi
 
   if command -v reboot >/dev/null 2>&1; then
+    echo "[agent] attempting reboot -f"
     reboot -f
+    sleep 2
   fi
 
-  echo "[agent] could not poweroff/reboot; sleeping to avoid init exit panic"
-  while true; do
-    sleep 3600
-  done
+  echo "[agent] ERROR: guest shutdown commands failed; exiting init"
+  exit "$code"
 }
 
 get_cmdline_arg() {
@@ -82,9 +96,22 @@ if [ ! -f "$ROOT_FILE" ]; then
   shutdown_vm 23
 fi
 
+PROGRAM_STDOUT_FILE="/tmp/program.stdout"
+PROGRAM_STDERR_FILE="/tmp/program.stderr"
+
 echo "[agent] running python3 $ROOT_FILE"
-timeout 10s python3 "$ROOT_FILE"
+timeout 10s python3 "$ROOT_FILE" >"$PROGRAM_STDOUT_FILE" 2>"$PROGRAM_STDERR_FILE"
 program_status="$?"
+
+echo "[agent] program_stdout_begin"
+cat "$PROGRAM_STDOUT_FILE"
+echo
+echo "[agent] program_stdout_end"
+
+echo "[agent] program_stderr_begin"
+cat "$PROGRAM_STDERR_FILE"
+echo
+echo "[agent] program_stderr_end"
 
 echo "[agent] program_status=$program_status"
 

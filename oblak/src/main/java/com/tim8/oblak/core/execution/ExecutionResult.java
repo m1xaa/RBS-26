@@ -9,5 +9,7 @@ public class ExecutionResult {
     private final int exitCode;
     private final String stdout;
     private final String stderr;
+    private final String programStdout;
+    private final String programStderr;
     private final String logPath;
 }
