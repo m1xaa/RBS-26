@@ -102,7 +102,7 @@ public class PasswordPolicyService {
     private Set<String> loadCommonPasswords() {
         Set<String> set = new HashSet<>();
         try (BufferedReader br = new BufferedReader(new InputStreamReader(
-                new ClassPathResource("common-passwords.txt").getInputStream(),
+                new ClassPathResource("passwords/common-passwords.txt").getInputStream(),
                 StandardCharsets.UTF_8))) {
             String line;
             while ((line = br.readLine()) != null) {

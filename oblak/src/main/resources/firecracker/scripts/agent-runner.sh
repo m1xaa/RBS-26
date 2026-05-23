@@ -99,6 +99,11 @@ fi
 PROGRAM_STDOUT_FILE="/tmp/program.stdout"
 PROGRAM_STDERR_FILE="/tmp/program.stderr"
 
+if [ -d "libs" ]; then
+  echo "[agent] detected libs/ directory, setting PYTHONPATH"
+  export PYTHONPATH="$WORKDIR/libs"
+fi
+
 echo "[agent] running python3 $ROOT_FILE"
 timeout 10s python3 "$ROOT_FILE" >"$PROGRAM_STDOUT_FILE" 2>"$PROGRAM_STDERR_FILE"
 program_status="$?"

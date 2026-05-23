@@ -2,13 +2,16 @@
 Oblak CDK CLI - klijent za upload fajlova na Oblak platformu.
 
 Server endpoint-i:
-    POST /auth/register   - {username, password} -> AuthResponse
-    POST /auth/login      - {username, password} -> AuthResponse
-    POST /auth/refresh    - {refreshToken} -> AuthResponse
-    POST /auth/logout     - {refreshToken} -> 200
-    POST /api/upload      - multipart/form-data sa poljem 'file'
+    POST /auth/register     - {username, password} -> AuthResponse
+    POST /auth/login        - {username, password} -> AuthResponse
+    POST /auth/refresh      - {refreshToken} -> AuthResponse
+    POST /auth/logout       - {refreshToken} -> 200
+    POST /api/upload        - multipart/form-data sa poljem 'file' -> UploadResponse
+    POST /api/execute/{id}  - pokrecu projekat -> ExecutionResult
 
-AuthResponse: {accessToken, refreshToken, username, accessExpirationMs}
+AuthResponse:    {accessToken, refreshToken, username, accessExpirationMs}
+UploadResponse:  {projectId, executeUrl}
+ExecutionResult: {exitCode, stdout, stderr, programStdout, programStderr, logPath}
 
 Komande:
     cdk register - kreiranje novog naloga
@@ -16,6 +19,7 @@ Komande:
     cdk logout   - brisanje sesije
     cdk whoami   - prikaz trenutnog korisnika
     cdk upload   - upload fajla
+    cdk run      - pokretanje uploadovanog projekta
     cdk config   - prikaz/podesavanje server URL-a
 """
 
@@ -305,7 +309,68 @@ def upload(file_path: str):
         click.echo(f"Greska {response.status_code}: {response.text}", err=True)
         raise click.Abort()
 
+    try:
+        data = response.json()
+        project_id = data["projectId"]
+        execute_url = data.get("executeUrl", f"/api/execute/{project_id}")
+    except (ValueError, KeyError):
+        click.echo("Server nije vratio ocekivani odgovor.", err=True)
+        raise click.Abort()
+
     click.echo(f"Fajl '{path.name}' uspesno uploadovan.")
+    click.echo(f"  Project ID:    {project_id}")
+    click.echo(f"  Pokretanje:    cdk run {project_id}")
+    click.echo(f"  Execute URL:   {get_server_url()}{execute_url}")
+
+
+@cli.command()
+@click.argument("project_id")
+def run(project_id: str):
+    """
+    Pokrece prethodno uploadovan projekat na serveru.
+
+    Primer:
+        cdk run 3ca8aa31-a907-4073-b1a2-27b349ece1f1
+    """
+    click.echo(f"Pokrecem projekat {project_id}...")
+
+    try:
+        response = authenticated_request(
+            "POST",
+            f"{get_server_url()}/api/execute/{project_id}",
+            timeout=300,
+        )
+    except requests.RequestException as e:
+        click.echo(f"Greska u komunikaciji sa serverom: {e}", err=True)
+        raise click.Abort()
+
+    if response.status_code == 404:
+        click.echo("Projekat nije pronadjen ili nemate dozvolu za pokretanje.", err=True)
+        raise click.Abort()
+    if response.status_code != 200:
+        click.echo(f"Greska {response.status_code}: {response.text}", err=True)
+        raise click.Abort()
+
+    try:
+        result = response.json()
+    except ValueError:
+        click.echo(f"Server vratio nevalidan odgovor: {response.text}", err=True)
+        raise click.Abort()
+
+    exit_code = result.get("exitCode", -1)
+    program_stdout = result.get("programStdout", "")
+    program_stderr = result.get("programStderr", "")
+
+    if program_stdout:
+        click.echo("--- stdout ---")
+        click.echo(program_stdout)
+    if program_stderr:
+        click.echo("--- stderr ---", err=True)
+        click.echo(program_stderr, err=True)
+
+    click.echo(f"--- exit code: {exit_code} ---")
+    if exit_code != 0:
+        raise click.exceptions.Exit(code=1)
 
 
 if __name__ == "__main__":
