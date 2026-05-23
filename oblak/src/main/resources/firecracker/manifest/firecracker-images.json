@@ -1,0 +1,18 @@
+{
+  "architecture": "x86_64",
+  "kernel": {
+    "version": "6.1.155",
+    "filename": "vmlinux-6.1.155",
+    "url": "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.15/x86_64/vmlinux-6.1.155"
+  },
+  "rootfs": {
+    "ubuntuVersion": "24.04",
+    "squashfsFilename": "ubuntu-24.04.squashfs",
+    "squashfsUrl": "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.15/x86_64/ubuntu-24.04.squashfs",
+    "ext4Filename": "ubuntu-24.04.ext4",
+    "ext4Size": "1G"
+  },
+  "localPaths": {
+    "imagesDir": "src/main/resources/firecracker/images"
+  }
+}

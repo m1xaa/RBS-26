@@ -1,5 +1,6 @@
 package com.tim8.oblak.minio;
 
+import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service
@@ -36,6 +38,25 @@ public class MinioService {
             return objectKey;
         } catch (Exception exception) {
             throw new IllegalStateException("Could not upload project image to MinIO.", exception);
+        }
+    }
+
+    public Path downloadProjectImage(UUID projectId) {
+        String objectKey = buildObjectKey(projectId);
+
+        try {
+            Path tempFile = Files.createTempFile("project-image-" + projectId + "-", ".ext4");
+            try (InputStream inputStream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                        .bucket(bucket)
+                        .object(objectKey)
+                        .build()
+            )) {
+                Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return tempFile;
+        } catch (Exception exception) {
+            throw new IllegalStateException("Could not download project image from MinIO.", exception);
         }
     }
 

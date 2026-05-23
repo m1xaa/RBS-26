@@ -1,5 +1,6 @@
 package com.tim8.oblak.exception;
 
+import com.tim8.oblak.core.execution.ExecutionTimeoutException;
 import com.tim8.oblak.core.validation.ZipValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleZipValidationException(ZipValidationException exception) {
         ApiError error = new ApiError(HttpStatus.BAD_REQUEST.value(), exception.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(ExecutionTimeoutException.class)
+    public ResponseEntity<ApiError> handleExecutionTimeoutException(ExecutionTimeoutException exception) {
+        ApiError error = new ApiError(HttpStatus.REQUEST_TIMEOUT.value(), exception.getMessage());
+        return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).body(error);
     }
 
     @ExceptionHandler(IllegalStateException.class)

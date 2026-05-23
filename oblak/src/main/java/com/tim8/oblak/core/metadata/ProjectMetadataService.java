@@ -11,12 +11,27 @@ public class ProjectMetadataService {
     private final ProjectMetadataRepository projectMetadataRepository;
 
     public ProjectMetadata createPending(MultipartFile file) {
+        String originalFilename = file.getOriginalFilename();
         ProjectMetadata metadata = new ProjectMetadata();
-        metadata.setName(file.getOriginalFilename());
+        metadata.setName(originalFilename);
         metadata.setSize(file.getSize());
+        metadata.setWorkingDirectory(resolveWorkingDirectory(originalFilename));
+        metadata.setRootFile("main.py");
         metadata.setUploadStatus(ProjectUploadStatus.PENDING);
 
         return projectMetadataRepository.save(metadata);
+    }
+
+    private String resolveWorkingDirectory(String originalFilename) {
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return ".";
+        }
+
+        if (originalFilename.toLowerCase().endsWith(".zip")) {
+            return originalFilename.substring(0, originalFilename.length() - 4);
+        }
+
+        return originalFilename;
     }
 
     public ProjectMetadata markCompleted(ProjectMetadata metadata, String minioKey) {
