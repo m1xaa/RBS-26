@@ -31,6 +31,7 @@ public class UploadService {
 
     public UUID upload(MultipartFile file, User owner) {
         Path projectImage = null;
+        ProjectMetadata metadata = null;
 
         try {
             zipValidation.validateZipFile(file);
@@ -44,19 +45,15 @@ public class UploadService {
                 throw new MaliciousCodeException("Malicious code detected.");
             }
 
-            // Priprema zavisnosti pre nego sto pakujemo u ext4 image.
-            // resolveWorkingDirectory daje isti workdir koji ce metadata imati.
-            String workingDirName = projectMetadataService
-                    .resolveWorkingDirectory(file.getOriginalFilename());
-            Path workdir = extractedDirectory.resolve(workingDirName);
-            if (!workdir.toFile().exists()) {
-                workdir = extractedDirectory;
-            }
-            executionPreparationService.prepare(workdir);
-
-            ProjectMetadata metadata = projectMetadataService.createPending(file, owner);
+            metadata = projectMetadataService.createPending(file, owner);
             try {
+                Path workdir = resolveProjectWorkdir(extractedDirectory, metadata);
+                boolean hasRequirements = workdir.resolve("requirements.txt").toFile().exists();
+
                 projectImage = projectFilesystemImageService.createExt4Image(extractedDirectory, metadata.getId());
+                if (hasRequirements) {
+                    executionPreparationService.prepareProjectImage(projectImage, metadata);
+                }
                 String minioKey = minioService.uploadProjectImage(projectImage, metadata.getId());
                 projectMetadataService.markCompleted(metadata, minioKey);
                 return metadata.getId();
@@ -68,5 +65,15 @@ public class UploadService {
             projectFilesystemImageService.deleteImage(projectImage);
             zipExtractionService.cleanTempDirectory();
         }
+    }
+
+    private Path resolveProjectWorkdir(Path extractedDirectory, ProjectMetadata metadata) {
+        String workingDirectoryName = metadata.getWorkingDirectory();
+        if (workingDirectoryName == null || workingDirectoryName.isBlank() || ".".equals(workingDirectoryName)) {
+            return extractedDirectory;
+        }
+
+        Path workdir = extractedDirectory.resolve(workingDirectoryName);
+        return workdir.toFile().exists() ? workdir : extractedDirectory;
     }
 }

@@ -2,6 +2,7 @@ package com.tim8.oblak.firecracker.assets;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -18,12 +19,22 @@ public class FirecrackerConfigBuilder {
 
     private final ObjectMapper objectMapper;
 
+    @Value("${oblak.firecracker.network.enabled:true}")
+    private boolean networkEnabled;
+
+    @Value("${oblak.firecracker.network.host-dev-name:tap0}")
+    private String networkHostDevName;
+
+    @Value("${oblak.firecracker.network.guest-mac:06:00:ac:10:00:02}")
+    private String networkGuestMac;
+
     public Path buildConfig(
             Path kernelImage,
             Path rootfsImage,
             Path projectImage,
             UUID projectId,
             String kernelBootArgs,
+            boolean attachNetwork,
             Path logPath,
             Path metricsPath
     ) {
@@ -31,6 +42,9 @@ public class FirecrackerConfigBuilder {
             Map<String, Object> config = new HashMap<>();
             config.put("boot-source", buildBootSource(kernelImage, kernelBootArgs));
             config.put("drives", buildDrives(rootfsImage, projectImage));
+            if (networkEnabled && attachNetwork) {
+                config.put("network-interfaces", buildNetworkInterfaces());
+            }
             config.put("machine-config", buildMachineConfig());
             config.put("logger", buildLogger(logPath));
             config.put("metrics", buildMetrics(metricsPath));
@@ -55,6 +69,14 @@ public class FirecrackerConfigBuilder {
             buildDrive("rootfs", rootfsImage, true, false),
             buildDrive("project", projectImage, false, false)
         );
+    }
+
+    private List<Map<String, Object>> buildNetworkInterfaces() {
+        Map<String, Object> networkInterface = new HashMap<>();
+        networkInterface.put("iface_id", "eth0");
+        networkInterface.put("host_dev_name", networkHostDevName);
+        networkInterface.put("guest_mac", networkGuestMac);
+        return List.of(networkInterface);
     }
 
     private Map<String, Object> buildDrive(String driveId, Path imagePath, boolean isRootDevice, boolean isReadOnly) {

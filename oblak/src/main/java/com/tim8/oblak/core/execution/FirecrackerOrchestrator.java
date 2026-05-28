@@ -33,19 +33,89 @@ public class FirecrackerOrchestrator {
     @Value("${oblak.firecracker.max-execution-time-seconds:20}")
     private long maxExecutionTimeSeconds;
 
+    @Value("${oblak.firecracker.max-preparation-time-seconds:300}")
+    private long maxPreparationTimeSeconds;
+
+    @Value("${oblak.firecracker.network.guest-ip:172.16.0.2}")
+    private String networkGuestIp;
+
+    @Value("${oblak.firecracker.network.guest-cidr-prefix:24}")
+    private int networkGuestCidrPrefix;
+
+    @Value("${oblak.firecracker.network.guest-gateway:172.16.0.1}")
+    private String networkGuestGateway;
+
+    @Value("${oblak.firecracker.network.dns-server:1.1.1.1}")
+    private String networkDnsServer;
+
+    public void prepareProjectImage(
+            Path kernelImage,
+            Path rootfsImage,
+            Path projectImage,
+            ProjectMetadata metadata
+    ) {
+        ExecutionResult result = run(
+                kernelImage,
+                rootfsImage,
+                projectImage,
+                metadata,
+                "prepare",
+                true,
+                maxPreparationTimeSeconds
+        );
+
+        if (result.getExitCode() != 0) {
+            throw new IllegalStateException(
+                    "Failed to prepare project image inside Firecracker.\nstdout:\n"
+                            + result.getStdout()
+                            + "\nstderr:\n"
+                            + result.getStderr()
+            );
+        }
+    }
+
     public ExecutionResult execute(
             Path kernelImage,
             Path rootfsImage,
             Path projectImage,
             ProjectMetadata metadata
     ) {
+        return run(
+                kernelImage,
+                rootfsImage,
+                projectImage,
+                metadata,
+                "execute",
+                false,
+                maxExecutionTimeSeconds
+        );
+    }
+
+    private ExecutionResult run(
+            Path kernelImage,
+            Path rootfsImage,
+            Path projectImage,
+            ProjectMetadata metadata,
+            String mode,
+            boolean attachNetwork,
+            long timeoutSeconds
+    ) {
         UUID projectId = metadata.getId();
         Path workingDirectory = createTempDirectory(projectId);
         Path logPath = workingDirectory.resolve("firecracker.log");
         Path metricsPath = workingDirectory.resolve("firecracker-metrics.log");
 
-        String bootArgs = buildBootArgs(metadata);
-        Path configFile = configBuilder.buildConfig(kernelImage, rootfsImage, projectImage, projectId, bootArgs, logPath, metricsPath);
+        String bootArgs = buildBootArgs(metadata, mode);
+        Path configFile = configBuilder.buildConfig(
+                kernelImage,
+                rootfsImage,
+                projectImage,
+                projectId,
+                bootArgs,
+                attachNetwork,
+                logPath,
+                metricsPath
+        );
         Path apiSocket = workingDirectory.resolve("firecracker-api.sock");
 
         Process process = null;
@@ -62,11 +132,11 @@ public class FirecrackerOrchestrator {
             Future<String> stdoutCapture = executorService.submit(() -> readStream(firecrackerProcess.getInputStream()));
             Future<String> stderrCapture = executorService.submit(() -> readStream(firecrackerProcess.getErrorStream()));
 
-            boolean finished = process.waitFor(maxExecutionTimeSeconds, TimeUnit.SECONDS);
+            boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
                 throw new ExecutionTimeoutException(
-                        "Project execution exceeded the maximum allowed time of " + maxExecutionTimeSeconds + " seconds."
+                        "Firecracker " + mode + " phase exceeded the maximum allowed time of " + timeoutSeconds + " seconds."
                 );
             }
 
@@ -104,7 +174,7 @@ public class FirecrackerOrchestrator {
         }
     }
 
-    private String buildBootArgs(ProjectMetadata metadata) {
+    private String buildBootArgs(ProjectMetadata metadata, String mode) {
         String projectRoot = metadata.getWorkingDirectory() == null ? "." : metadata.getWorkingDirectory();
         String rootFile = metadata.getRootFile() == null ? "main.py" : metadata.getRootFile();
 
@@ -117,10 +187,15 @@ public class FirecrackerOrchestrator {
                 "rw",
                 "rootwait",
                 "init=/usr/local/bin/agent-runner",
+                "MODE=" + mode,
                 "PROJECT_DISK=/dev/vdb",
                 "PROJECT_MOUNT=/mnt/project",
                 "PROJECT_ROOT=" + projectRoot,
-                "ROOT_FILE=" + rootFile
+                "ROOT_FILE=" + rootFile,
+                "GUEST_IP=" + networkGuestIp,
+                "GUEST_CIDR_PREFIX=" + networkGuestCidrPrefix,
+                "GUEST_GATEWAY=" + networkGuestGateway,
+                "DNS_SERVER=" + networkDnsServer
         ));
     }
 
