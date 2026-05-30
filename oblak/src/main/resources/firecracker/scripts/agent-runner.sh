@@ -123,7 +123,7 @@ PY
     return 1
   fi
 
-  python3 /tmp/get-pip.py --disable-pip-version-check
+  python3 /tmp/get-pip.py --disable-pip-version-check --break-system-packages
 }
 
 mkdir -p "$PROJECT_MOUNT"

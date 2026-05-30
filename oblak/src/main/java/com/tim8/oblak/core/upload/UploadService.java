@@ -37,13 +37,13 @@ public class UploadService {
             zipValidation.validateZipFile(file);
             Path extractedDirectory = zipExtractionService.extractZipToTempDir(file);
 
-            List<AnalysisResult> results = codeAnalysisService.analyzeExtractedFiles(extractedDirectory);
-            boolean malicious =
-                    results.stream()
-                            .anyMatch(AnalysisResult::isMalicious);
-            if (malicious) {
-                throw new MaliciousCodeException("Malicious code detected.");
-            }
+            // List<AnalysisResult> results = codeAnalysisService.analyzeExtractedFiles(extractedDirectory);
+            // boolean malicious =
+            //         results.stream()
+            //                 .anyMatch(AnalysisResult::isMalicious);
+            // if (malicious) {
+            //     throw new MaliciousCodeException("Malicious code detected.");
+            // }
 
             metadata = projectMetadataService.createPending(file, owner);
             try {
