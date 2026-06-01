@@ -39,6 +39,7 @@ ROOTFS_EXT4_SIZE="$(jq -r '.rootfs.ext4Size' "$MANIFEST")"
 KERNEL_PATH="$IMAGES_DIR/$KERNEL_FILENAME"
 ROOTFS_SQUASHFS_PATH="$IMAGES_DIR/$ROOTFS_SQUASHFS_FILENAME"
 ROOTFS_EXT4_PATH="$IMAGES_DIR/$ROOTFS_EXT4_FILENAME"
+FORCE_REBUILD_ROOTFS="${FORCE_REBUILD_ROOTFS:-0}"
 
 mkdir -p "$IMAGES_DIR"
 
@@ -63,13 +64,18 @@ fi
 
 echo
 
-if [ -f "$ROOTFS_EXT4_PATH" ]; then
+if [ -f "$ROOTFS_EXT4_PATH" ] && [ "$FORCE_REBUILD_ROOTFS" != "1" ]; then
   echo "Rootfs ext4 already exists: $ROOTFS_EXT4_PATH"
   echo
   echo "Done."
   echo "Kernel: $KERNEL_PATH"
   echo "Rootfs: $ROOTFS_EXT4_PATH"
   exit 0
+fi
+
+if [ -f "$ROOTFS_EXT4_PATH" ] && [ "$FORCE_REBUILD_ROOTFS" = "1" ]; then
+  echo "Rebuilding rootfs ext4 because the embedded agent-runner is stale..."
+  rm -f "$ROOTFS_EXT4_PATH"
 fi
 
 echo "Creating ext4 rootfs..."
@@ -94,6 +100,20 @@ if [ ! -x "$SQUASHFS_ROOT_DIR/usr/bin/python3" ]; then
 fi
 
 echo "python3 already exists in rootfs."
+
+if [ -x "$SQUASHFS_ROOT_DIR/usr/bin/pip3" ] || [ -x "$SQUASHFS_ROOT_DIR/usr/bin/pip" ]; then
+  echo "pip already exists in rootfs."
+else
+  echo "pip does not exist in rootfs. It will be bootstrapped inside the guest during prepare mode."
+fi
+
+if [ ! -x "$SQUASHFS_ROOT_DIR/usr/sbin/ip" ] && [ ! -x "$SQUASHFS_ROOT_DIR/usr/bin/ip" ] && [ ! -x "$SQUASHFS_ROOT_DIR/bin/ip" ]; then
+  echo "ERROR: ip command does not exist in rootfs."
+  echo "Use a rootfs that already contains iproute2."
+  exit 1
+fi
+
+echo "ip command already exists in rootfs."
 
 AGENT_SCRIPT_SOURCE="src/main/resources/firecracker/scripts/agent-runner.sh"
 AGENT_SCRIPT_DEST="$SQUASHFS_ROOT_DIR/usr/local/bin/agent-runner"

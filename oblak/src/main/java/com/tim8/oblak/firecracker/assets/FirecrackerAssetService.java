@@ -6,9 +6,12 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 
 @Service
 public class FirecrackerAssetService {
+
+    private static final Path AGENT_RUNNER_PATH = Path.of("src/main/resources/firecracker/scripts/agent-runner.sh");
 
     @Value("${oblak.firecracker.kernel-path}")
     private String kernelPath;
@@ -22,8 +25,9 @@ public class FirecrackerAssetService {
     public void ensureRequiredAssetsExist() {
         Path resolvedKernelPath = Path.of(kernelPath);
         Path resolvedRootfsPath = Path.of(rootfsPath);
+        boolean forceRebuildRootfs = shouldRebuildRootfs(resolvedRootfsPath);
 
-        if (Files.exists(resolvedKernelPath) && Files.exists(resolvedRootfsPath)) {
+        if (!forceRebuildRootfs && Files.exists(resolvedKernelPath) && Files.exists(resolvedRootfsPath)) {
             return;
         }
 
@@ -32,18 +36,37 @@ public class FirecrackerAssetService {
             throw new IllegalStateException("Missing Firecracker fetch script: " + resolvedFetchScriptPath);
         }
 
-        runFetchScript(resolvedFetchScriptPath);
+        runFetchScript(resolvedFetchScriptPath, forceRebuildRootfs);
 
         if (Files.notExists(resolvedKernelPath) || Files.notExists(resolvedRootfsPath)) {
             throw new IllegalStateException("Firecracker assets are still missing after running fetch script.");
         }
     }
 
-    private void runFetchScript(Path fetchScript) {
+    private boolean shouldRebuildRootfs(Path resolvedRootfsPath) {
         try {
-            Process process = new ProcessBuilder("bash", fetchScript.toString())
+            if (Files.notExists(resolvedRootfsPath) || Files.notExists(AGENT_RUNNER_PATH)) {
+                return Files.notExists(resolvedRootfsPath);
+            }
+
+            FileTime rootfsModifiedAt = Files.getLastModifiedTime(resolvedRootfsPath);
+            FileTime agentRunnerModifiedAt = Files.getLastModifiedTime(AGENT_RUNNER_PATH);
+            return agentRunnerModifiedAt.compareTo(rootfsModifiedAt) > 0;
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not determine whether the Firecracker rootfs needs rebuilding.", exception);
+        }
+    }
+
+    private void runFetchScript(Path fetchScript, boolean forceRebuildRootfs) {
+        try {
+            ProcessBuilder processBuilder = new ProcessBuilder("bash", fetchScript.toString())
                 .redirectErrorStream(true)
-                .start();
+                ;
+            if (forceRebuildRootfs) {
+                processBuilder.environment().put("FORCE_REBUILD_ROOTFS", "1");
+            }
+
+            Process process = processBuilder.start();
 
             String output = new String(process.getInputStream().readAllBytes());
             int exitCode = process.waitFor();
