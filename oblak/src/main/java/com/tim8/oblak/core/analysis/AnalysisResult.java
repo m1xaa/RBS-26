@@ -10,6 +10,12 @@ import java.util.List;
 public class AnalysisResult {
 
     private boolean malicious;
+
     private String banditOutput;
+
+    private String antivirusOutput;
+
+    private String dependencyOutput;
+
     private List<String> issues;
 }

@@ -38,3 +38,10 @@ out/
 
 ### Direcotry for extracting zip files ###
 temp
+
+src/main/resources/firecracker/images/*
+!src/main/resources/firecracker/images/.gitkeep
+
+*.sock
+*.log
+*.metrics

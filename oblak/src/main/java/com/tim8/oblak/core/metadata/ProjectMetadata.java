@@ -1,11 +1,14 @@
 package com.tim8.oblak.core.metadata;
 
+import com.tim8.oblak.user.User;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,6 +32,14 @@ public class ProjectMetadata {
 
     private String name;
 
+    private String workingDirectory;
+
+    private String rootFile;
+
     @Enumerated(EnumType.STRING)
     private ProjectUploadStatus uploadStatus;
+
+    @ManyToOne
+    @JoinColumn(name = "owner_id")
+    private User owner;
 }
