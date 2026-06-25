@@ -1,5 +1,11 @@
 package com.tim8.oblak.core.upload;
 
+import com.tim8.oblak.audit.AuditAction;
+import com.tim8.oblak.audit.AuditEvent;
+import com.tim8.oblak.audit.AuditOutcome;
+import com.tim8.oblak.audit.AuditService;
+import com.tim8.oblak.audit.IpResolver;
+import com.tim8.oblak.core.analysis.AnalysisResult;
 import com.tim8.oblak.core.analysis.CodeAnalysisService;
 import com.tim8.oblak.core.execution.ExecutionPreparationService;
 import com.tim8.oblak.exception.MaliciousCodeException;
@@ -12,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import com.tim8.oblak.core.analysis.AnalysisResult;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -30,6 +35,8 @@ public class UploadService {
     private final ProjectMetadataService projectMetadataService;
     private final ProjectFilesystemImageService projectFilesystemImageService;
     private final MinioService minioService;
+    private final AuditService auditService;
+    private final IpResolver ipResolver;
 
     public UUID upload(MultipartFile file, User owner) {
         log.info("Upload started: file='{}', owner='{}'", file.getOriginalFilename(), owner.getUsername());
@@ -49,10 +56,13 @@ public class UploadService {
 
             if (malicious) {
                 log.warn("Malicious code detected in upload by owner='{}', file='{}'", owner.getUsername(), file.getOriginalFilename());
+                auditService.record(AuditEvent.builder(AuditAction.PROJECT_UPLOAD, AuditOutcome.BLOCKED)
+                        .actor(owner.getUsername())
+                        .detail("Malicious code detected in: " + file.getOriginalFilename())
+                        .ip(ipResolver.resolve())
+                        .build());
                 throw new MaliciousCodeException("Malicious code detected.");
             }
-
-            log.debug("Code analysis passed — no malicious content detected");
 
             metadata = projectMetadataService.createPending(file, owner);
             log.info("Project metadata created: projectId='{}', status=PENDING", metadata.getId());
@@ -63,25 +73,37 @@ public class UploadService {
                 log.debug("Resolved workdir='{}', hasRequirements={}", workdir, hasRequirements);
 
                 projectImage = projectFilesystemImageService.createExt4Image(extractedDirectory, metadata.getId());
-                log.debug("Ext4 image created at '{}'", projectImage);
 
                 if (hasRequirements) {
                     log.info("Installing dependencies for projectId='{}'", metadata.getId());
                     executionPreparationService.prepareProjectImage(projectImage, metadata);
-                    log.info("Dependency installation complete for projectId='{}'", metadata.getId());
                 }
 
                 String minioKey = minioService.uploadProjectImage(projectImage, metadata.getId());
-                log.debug("Project image uploaded to MinIO: key='{}'", minioKey);
-
                 projectMetadataService.markCompleted(metadata, minioKey);
-                log.info("Upload completed successfully: projectId='{}'", metadata.getId());
 
+                auditService.record(AuditEvent.builder(AuditAction.PROJECT_UPLOAD, AuditOutcome.SUCCESS)
+                        .actor(owner.getUsername())
+                        .resource(metadata.getId())
+                        .detail("file=" + file.getOriginalFilename())
+                        .ip(ipResolver.resolve())
+                        .build());
+
+                log.info("Upload completed successfully: projectId='{}'", metadata.getId());
                 return metadata.getId();
 
             } catch (RuntimeException exception) {
-                log.error("Upload failed after metadata creation: projectId='{}', reason='{}'", metadata.getId(), exception.getMessage(), exception);
+                log.error("Upload failed after metadata creation: projectId='{}', reason='{}'",
+                        metadata.getId(), exception.getMessage(), exception);
                 projectMetadataService.markFailed(metadata);
+
+                auditService.record(AuditEvent.builder(AuditAction.PROJECT_UPLOAD, AuditOutcome.FAILURE)
+                        .actor(owner.getUsername())
+                        .resource(metadata.getId())
+                        .detail(exception.getMessage())
+                        .ip(ipResolver.resolve())
+                        .build());
+
                 throw exception;
             }
         } finally {
@@ -94,13 +116,11 @@ public class UploadService {
     private Path resolveProjectWorkdir(Path extractedDirectory, ProjectMetadata metadata) {
         String workingDirectoryName = metadata.getWorkingDirectory();
         if (workingDirectoryName == null || workingDirectoryName.isBlank() || ".".equals(workingDirectoryName)) {
-            log.debug("No working directory specified, using root of extracted directory");
             return extractedDirectory;
         }
 
         Path workdir = extractedDirectory.resolve(workingDirectoryName);
         if (workdir.toFile().exists()) {
-            log.debug("Resolved working directory: '{}'", workdir);
             return workdir;
         }
 

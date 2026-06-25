@@ -1,5 +1,10 @@
 package com.tim8.oblak.core.execution;
 
+import com.tim8.oblak.audit.AuditAction;
+import com.tim8.oblak.audit.AuditEvent;
+import com.tim8.oblak.audit.AuditOutcome;
+import com.tim8.oblak.audit.AuditService;
+import com.tim8.oblak.audit.IpResolver;
 import com.tim8.oblak.core.metadata.ProjectMetadata;
 import com.tim8.oblak.core.metadata.ProjectMetadataRepository;
 import com.tim8.oblak.firecracker.assets.FirecrackerAssetService;
@@ -23,18 +28,35 @@ public class ExecutionService {
     private final MinioService minioService;
     private final ProjectMetadataRepository projectMetadataRepository;
     private final FirecrackerOrchestrator firecrackerOrchestrator;
+    private final AuditService auditService;
+    private final IpResolver ipResolver;
 
     public ExecutionResult execute(UUID projectId, String requesterUsername) {
         log.info("Execution requested: projectId='{}', requester='{}'", projectId, requesterUsername);
 
         ProjectMetadata metadata = projectMetadataRepository.findById(projectId)
                 .orElseThrow(() -> {
-                    log.warn("Execution rejected — project not found: projectId='{}', requester='{}'", projectId, requesterUsername);
+                    log.warn("Execution rejected — project not found: projectId='{}', requester='{}'",
+                            projectId, requesterUsername);
+                    auditService.record(AuditEvent.builder(AuditAction.PROJECT_EXECUTE, AuditOutcome.REJECTED)
+                            .actor(requesterUsername)
+                            .resource(projectId)
+                            .detail("Project not found")
+                            .ip(ipResolver.resolve())
+                            .build());
                     return new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found: " + projectId);
                 });
 
-        if (metadata.getOwner() == null || !metadata.getOwner().getUsername().equals(requesterUsername)) {
-            log.warn("Execution rejected — requester '{}' is not the owner of projectId='{}'", requesterUsername, projectId);
+        if (metadata.getOwner() == null
+                || !metadata.getOwner().getUsername().equals(requesterUsername)) {
+            log.warn("Execution rejected — requester '{}' is not the owner of projectId='{}'",
+                    requesterUsername, projectId);
+            auditService.record(AuditEvent.builder(AuditAction.PROJECT_EXECUTE, AuditOutcome.REJECTED)
+                    .actor(requesterUsername)
+                    .resource(projectId)
+                    .detail("Not the owner")
+                    .ip(ipResolver.resolve())
+                    .build());
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found: " + projectId);
         }
 
@@ -51,6 +73,13 @@ public class ExecutionService {
                     projectImage,
                     metadata
             );
+
+            auditService.record(AuditEvent.builder(AuditAction.PROJECT_EXECUTE, AuditOutcome.SUCCESS)
+                    .actor(requesterUsername)
+                    .resource(projectId)
+                    .ip(ipResolver.resolve())
+                    .build());
+
             log.info("Execution finished for projectId='{}'", projectId);
             return result;
 
