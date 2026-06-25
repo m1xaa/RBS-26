@@ -1,0 +1,3 @@
+PixelBlog je minimalistička blog platforma na kojoj korisnici mogu da instaliraju
+sopstvene teme. Otpremite .tar arhivu sa CSS/JS fajlovima teme i ona će biti
+odmah primenjena na sajt.

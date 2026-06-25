@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8" />
+<title>PixelBlog - Theme Installer</title>
+<style>
+  body { font-family: sans-serif; max-width: 640px; margin: 40px auto; line-height: 1.5; }
+  h1 { margin-bottom: 0; }
+  .muted { color: #666; }
+  section { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 24px; }
+  pre { background: #f4f4f4; padding: 12px; border-radius: 6px; white-space: pre-wrap; }
+  button { padding: 8px 16px; cursor: pointer; }
+</style>
+</head>
+<body>
+  <h1>PixelBlog</h1>
+  <p class="muted">Minimalna blog platforma sa instalerom tema.</p>
+
+  <section>
+    <h2>Instaliraj temu</h2>
+    <p>Otpremite <code>.tar</code> arhivu sa fajlovima vaše teme.</p>
+    <form id="upload-form">
+      <input type="file" id="theme-file" name="theme" accept=".tar,.tar.gz" required />
+      <button type="submit">Instaliraj</button>
+    </form>
+    <pre id="upload-result"></pre>
+  </section>
+
+  <section>
+    <h2>O sajtu</h2>
+    <button id="about-btn">Prikaži "About" stranicu</button>
+    <pre id="about-result"></pre>
+  </section>
+
+  <script>
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = document.getElementById('theme-file').files[0];
+      const out = document.getElementById('upload-result');
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('theme', file);
+
+      const res = await fetch('/api/theme/install', { method: 'POST', body: formData });
+      const data = await res.json();
+      out.textContent = JSON.stringify(data, null, 2);
+    });
+
+    document.getElementById('about-btn').addEventListener('click', async () => {
+      const out = document.getElementById('about-result');
+      const res = await fetch('/api/about');
+      const data = await res.json();
+      out.textContent = JSON.stringify(data, null, 2);
+    });
+  </script>
+</body>
+</html>

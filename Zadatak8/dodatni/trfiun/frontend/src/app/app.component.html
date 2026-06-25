@@ -1,0 +1,50 @@
+<main class="page">
+  <section class="card">
+    <header>
+      <p class="eyebrow">CVE-2007-4559 demo</p>
+      <h1>Submission Portal</h1>
+      <p class="welcome">{{ welcomeMessage }}</p>
+    </header>
+
+    <form (ngSubmit)="submit()" class="form">
+      <label for="archive">Projekat (.tar / .tar.gz)</label>
+      <input
+        id="archive"
+        type="file"
+        class="file-input"
+        accept=".tar,.tar.gz,.tgz"
+        (change)="onFileSelected($event)"
+      />
+
+      <div
+        class="drop-zone"
+        [class.drop-zone--active]="dragOver"
+        (click)="openFilePicker()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onFileDrop($event)"
+      >
+        <p class="drop-zone__title">Prevucite arhivu ovde</p>
+        <p class="drop-zone__hint">ili kliknite da izaberete fajl</p>
+        <p class="drop-zone__file" *ngIf="selectedFile">{{ selectedFile.name }}</p>
+      </div>
+
+      <button type="submit" [disabled]="loading || !selectedFile">
+        {{ loading ? 'Slanje...' : 'Pošalji arhivu' }}
+      </button>
+    </form>
+
+    <p class="error" *ngIf="error">{{ error }}</p>
+
+    <section class="result" *ngIf="result">
+      <h2>Uspešno primljeno</h2>
+      <p>{{ result.message }}</p>
+      <p><strong>ID:</strong> {{ result.submission_id }}</p>
+      <p><strong>Lokacija:</strong> {{ result.extracted_to }}</p>
+      <ul *ngIf="result.files.length">
+        <li *ngFor="let file of result.files">{{ file }}</li>
+      </ul>
+      <p *ngIf="!result.files.length">Arhiva nema vidljivih fajlova u ekstrakcionom direktorijumu.</p>
+    </section>
+  </section>
+</main>

@@ -1,0 +1,32 @@
+.center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 90vh;
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .textarea {
+      resize: none;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+
+      .submit {
+        width: 30%;
+        height: 40px;
+      }
+
+      .reset {
+        width: 30%;
+        height: 40px;
+      }
+    }
+  }
+}

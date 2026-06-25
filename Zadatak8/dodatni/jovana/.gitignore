@@ -1,0 +1,5 @@
+backend/themes/*/
+!backend/themes/.gitkeep
+__pycache__/
+*.pyc
+*.tar
