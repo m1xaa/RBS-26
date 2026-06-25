@@ -32,7 +32,7 @@ public class AuditEvent {
     private String resourceId;
 
     // Optional human-readable detail (e.g. malicious score, failure reason)
-    @Column(length = 512)
+    @Column(columnDefinition = "TEXT")
     private String detail;
 
     @Column(length = 64)
