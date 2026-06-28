@@ -1,0 +1,10 @@
+<div class="center">
+  <form class="form" [formGroup]="userForm" (ngSubmit)="onSubmit()">
+    <label style="text-align: center">Forma za YAML</label>
+    <textarea class="textarea" cols="80" rows="10" type="text" formControlName="yaml"></textarea>
+    <div class="controls">
+      <button class="reset" type="reset">Reset</button>
+      <button class="submit" type="submit">Submit</button>
+    </div>
+  </form>
+</div>
